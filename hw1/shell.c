@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <fcntl.h> 
 
 #define INPUT_STRING_SIZE 80
 
@@ -105,7 +106,43 @@ process* create_process(char* inputString)
     return NULL;
 }
 
+char * concat(char * s1, char * s2){
+   char * result;
+   result = malloc(strlen(s1)+strlen(s2)+1);
+   strcpy(result,s1);
+   strcat(result,s2);
+return result;
+}
 
+void pathResolve(tok_t * t){
+ char * path_env=getenv("PATH"),* path;
+ tok_t * pathToks = getToks(path_env);
+ int i;
+	for(i=0;i<MAXTOKS && pathToks[i];i++){
+	 path = concat("/",t[0]);
+	 path = concat(pathToks[i],path);
+	 if(access(path,F_OK)!=-1){
+	 execve(path,t,NULL);
+	 //exit(0);
+        }		
+  }
+	//part 2
+   execv(*t,t);
+   perror(*t);
+   exit(0);
+}
+
+void redirect(tok_t *input,char * filename){ 
+int newfd; 
+
+  if ((newfd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644)) < 0) {
+	perror(input);
+	exit(1);
+  }
+ dup2(newfd, 1);
+ 
+ pathResolve(input);
+}
 
 int shell (int argc, char *argv[]) {
     char *s = malloc(INPUT_STRING_SIZE+1);			/* user input string */
@@ -115,33 +152,46 @@ int shell (int argc, char *argv[]) {
     pid_t pid = getpid();		/* get current processes PID */
     pid_t ppid = getppid();	/* get parents PID */
     pid_t cpid, tcpid, cpgid;
-    char * dir;
+    char dir[100] ="";
     init_shell();
 
     printf("%s running as PID %d under %d\n",argv[0],pid,ppid);
-    getcwd(dir,100);
+    //getcwd(dir,100);
     lineNum=0;
-    fprintf(stdout, "%d %s: ", lineNum,dir);
+    fprintf(stdout, "%d %s: ", lineNum,getcwd(dir,100));
     while ((s = freadln(stdin))){
         t = getToks(s); /* break the line into tokens */
         fundex = lookup(t[0]); /* Is first token a shell literal */
         if(fundex >= 0) cmd_table[fundex].fun(&t[1]);
         else {
-            //fprintf(stdout, "This shell only supports built-ins. Replace this to run programs as commands.\n");
             pid = fork();
             if(pid<0)
                 perror("Fork process failed");
             if(pid==0){
-                cpid = getpid();
-                execv(*t,t);
-                perror(*t);
-                exit(0);
+ 		char *temp = strstr(s,">");
+		int i=0;
+		char * a=">", * b = "<";
+		for(i=0;i<MAXTOKS && t[i];i++){
+		 if (strcmp( t[i], a) == 0){
+	 	  t[i]=NULL;
+		  printf("%s",t[i+1]);
+		   redirect(t,t[i+1]);	
+                  }
+                  if(strcmp( t[i], b) == 0){
+                  t[i]=NULL;
+		  printf("%s",t[i+1]);
+		  redirect(t,t[i+1]);
+	          }
+		}
+              pathResolve(t);
+		
+		
             }
             wait(NULL);
         }
         lineNum++;
         getcwd(dir,100);
-        fprintf(stdout, "%d %s: ", lineNum,dir);
+        fprintf(stdout, "%d %s: ", lineNum,getcwd(dir,100));
     }
     return 0;
 }
