@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <fcntl.h>
 
 #define INPUT_STRING_SIZE 80
 #define MAX_SIZE 1024
@@ -53,7 +54,7 @@ int cmd_help(tok_t arg[]) {
 int cmd_cd(tok_t arg[]){
     if(chdir(arg[0])==-1){
         fprintf(stdout,"the directory cannot be accessed %s/n",arg[0]);
-                return -1;
+        return -1;
     }
     return 1;
 }
@@ -85,15 +86,43 @@ void pathResolve(tok_t * t){
     exit(0);
 }
 
+void redirect(tok_t *input,char * filename,char * redir_pipe){
+    int newfd;
+
+    if ((newfd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644)) < 0) {
+        perror(input);
+        exit(1);
+    }
+    if(redir_pipe==">")
+        dup2(newfd, 1);
+    else if(redir_pipe=="<")
+        dup2(newfd,0);
+    pathResolve(input);
+}
+
 int cmd_exec(tok_t *t){
     int pid;
     pid = fork();
     if(pid<0)
         perror("Fork process failed");
     else if(pid==0){
-   // execve(arg[0],arg,NULL);
+        // execve(arg[0],arg,NULL);
+        int i=0;
+        char * a=">", * b = "<";
+        for(i=0;i<MAXTOKS && t[i];i++){
+            if (strcmp( t[i], a) == 0){
+                t[i]=NULL;
+                printf("%s",t[i+1]);
+                redirect(t,t[i+1],a);
+            }
+            if(strcmp( t[i], b) == 0){
+                t[i]=NULL;
+                printf("%s",t[i+1]);
+                redirect(t,t[i+1],b);
+            }
+        }
         pathResolve(t);
-    exit(-1);
+        exit(-1);
     }
     wait(NULL);
 }
