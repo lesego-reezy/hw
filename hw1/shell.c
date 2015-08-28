@@ -25,6 +25,7 @@ int cmd_quit(tok_t arg[]) {
 
 int cmd_help(tok_t arg[]);
 int cmd_cd(tok_t arg[]);
+int cmd_exec(tok_t arg[]);
 
 /* Command Lookup table */
 typedef int cmd_fun_t (tok_t args[]); /* cmd functions take token array and return int */
@@ -54,6 +55,18 @@ int cmd_cd(tok_t arg[]){
                 return -1;
     }
     return 1;
+}
+
+int cmd_exec(tok_t arg[]){
+    int pid;
+    pid = fork();
+    if(pid<0)
+        perror("Fork process failed");
+    else if(pid==0){
+    execve(arg[0],arg,NULL);
+    exit(-1);
+    }
+    wait(NULL);
 }
 
 int lookup(char cmd[]) {
@@ -135,7 +148,8 @@ int shell (int argc, char *argv[]) {
         fundex = lookup(t[0]); /* Is first token a shell literal */
         if(fundex >= 0) cmd_table[fundex].fun(&t[1]);
         else {
-            fprintf(stdout, "This shell only supports built-ins. Replace this to run programs as commands.\n");
+            //fprintf(stdout, "This shell only supports built-ins. Replace this to run programs as commands.\n");
+            cmd_exec(&t[0]);
         }
         lineNum++;
         getcwd(dir,MAX_SIZE);
