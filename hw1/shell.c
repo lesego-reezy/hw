@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #define INPUT_STRING_SIZE 80
 #define MAX_SIZE 1024
@@ -102,6 +103,18 @@ void redirect(tok_t *input,char * filename,char * redir_pipe){
 
 int cmd_exec(tok_t *t){
     int pid;
+
+    // Part 5
+    process* cur_process = (process*)malloc(sizeof(process));
+    assert(cur_process != NULL);
+    cur_process->argv = &t[0];
+    cur_process->completed = cur_process->stopped = 0;
+    cur_process->stdin = cur_process->stdout = -1;
+    cur_process->tmodes = shell_tmodes;
+    (cur_process->tmodes).c_lflag |= (IEXTEN | ISIG | ICANON );
+
+    add_process(cur_process);
+
     pid = fork();
     if(pid<0)
         perror("Fork process failed");
@@ -170,6 +183,15 @@ void init_shell()
 void add_process(process* p)
 {
     /** YOUR CODE HERE */
+    assert(first_process!=NULL);
+
+    if(p==NULL) return;
+    printf("add_process: %d\n",p->pid);
+    p->next = first_process->next;//first_process acts as a head on the linked list
+    if(first_process->next!=NULL)
+        first_process->next->prev = p;
+    p->prev = first_process;
+    first_process->next = p;
 }
 
 /**
