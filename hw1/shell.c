@@ -217,6 +217,21 @@ int shell (int argc, char *argv[]) {
 
 
     init_shell();
+    //Appropriate fields for process struct
+    first_process = (process*)malloc(sizeof(process));
+    assert(first_process != NULL);
+    first_process->pid = pid;
+    first_process->completed = first_process->stopped  = 0;
+    first_process->status = 0;
+    first_process->background = 0;
+    first_process->tmodes = shell_tmodes;
+    first_process->argc = argc;
+    first_process->argv = argv;
+    first_process->stdin = STDIN_FILENO;
+    first_process->stdout = STDOUT_FILENO;
+    first_process->stderr = STDERR_FILENO;
+    first_process->next = first_process->prev = NULL;
+
 
     printf("%s running as PID %d under %d\n",argv[0],pid,ppid);
 
