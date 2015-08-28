@@ -28,6 +28,7 @@ int cmd_cd(tok_t arg[]);
 int cmd_exec(tok_t arg[]);
 
 /* Command Lookup table */
+typedef int cmd_fun_t(tok_t *t);
 typedef int cmd_fun_t (tok_t args[]); /* cmd functions take token array and return int */
 typedef struct fun_desc {
     cmd_fun_t *fun;
@@ -57,13 +58,41 @@ int cmd_cd(tok_t arg[]){
     return 1;
 }
 
-int cmd_exec(tok_t arg[]){
+//concatinate two strings
+char * concat(char * s1, char * s2){
+    char * result;
+    result = malloc(strlen(s1)+strlen(s2)+1);
+    strcpy(result,s1);
+    strcat(result,s2);
+    return result;
+}
+
+void pathResolve(tok_t * t){
+    char * path_env=getenv("PATH"),* path;
+    tok_t * pathToks = getToks(path_env);
+    int i;
+    for(i=0;i<MAXTOKS && pathToks[i];i++){
+        path = concat("/",t[0]);
+        path = concat(pathToks[i],path);
+        if(access(path,F_OK)!=-1){
+            execve(path,t,NULL);
+            //exit(0);
+        }
+    }
+    //part 2
+    execv(*t,t);
+    perror(*t);
+    exit(0);
+}
+
+int cmd_exec(tok_t *t){
     int pid;
     pid = fork();
     if(pid<0)
         perror("Fork process failed");
     else if(pid==0){
-    execve(arg[0],arg,NULL);
+   // execve(arg[0],arg,NULL);
+        pathResolve(t);
     exit(-1);
     }
     wait(NULL);
@@ -149,7 +178,7 @@ int shell (int argc, char *argv[]) {
         if(fundex >= 0) cmd_table[fundex].fun(&t[1]);
         else {
             //fprintf(stdout, "This shell only supports built-ins. Replace this to run programs as commands.\n");
-            cmd_exec(&t[0]);
+            cmd_exec(t);
         }
         lineNum++;
         getcwd(dir,MAX_SIZE);
