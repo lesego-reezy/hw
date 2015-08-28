@@ -8,9 +8,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdbool.h>
-#include <fcntl.h> 
 
 #define INPUT_STRING_SIZE 80
+#define MAX_SIZE 1024
 
 #include "io.h"
 #include "parse.h"
@@ -37,17 +37,21 @@ typedef struct fun_desc {
 fun_desc_t cmd_table[] = {
     {cmd_help, "?", "show this help menu"},
     {cmd_quit, "quit", "quit the command shell"},
-    {cmd_cd,"cd","change working directory"},
+    {cmd_cd,"cd","change current working directory"},
 };
-int cmd_cd(tok_t arg[]){
-    if(chdir(arg[0])==-1)
-        printf("  bash: cd: %s: No such file or directory\n",arg[0]);
-    return 1;
-}
+
 int cmd_help(tok_t arg[]) {
     int i;
     for (i=0; i < (sizeof(cmd_table)/sizeof(fun_desc_t)); i++) {
         printf("%s - %s\n",cmd_table[i].cmd, cmd_table[i].doc);
+    }
+    return 1;
+}
+
+int cmd_cd(tok_t arg[]){
+    if(chdir(arg[0])==-1){
+        fprintf(stdout,"the directory cannot be accessed %s/n",arg[0]);
+                return -1;
     }
     return 1;
 }
@@ -106,94 +110,36 @@ process* create_process(char* inputString)
     return NULL;
 }
 
-char * concat(char * s1, char * s2){
-    char * result;
-    result = malloc(strlen(s1)+strlen(s2)+1);
-    strcpy(result,s1);
-    strcat(result,s2);
-    return result;
-}
 
-void pathResolve(tok_t * t){
-    char * path_env=getenv("PATH"),* path;
-    tok_t * pathToks = getToks(path_env);
-    int i;
-    for(i=0;i<MAXTOKS && pathToks[i];i++){
-        path = concat("/",t[0]);
-        path = concat(pathToks[i],path);
-        if(access(path,F_OK)!=-1){
-            execve(path,t,NULL);
-            //exit(0);
-        }
-    }
-    //part 2
-    execv(*t,t);
-    perror(*t);
-    exit(0);
-}
-
-void redirect(tok_t *input,char * filename,char * redir_pipe){
-    int newfd;
-
-    if ((newfd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644)) < 0) {
-        perror(input);
-        exit(1);
-    }
-    if(redir_pipe==">")
-        dup2(newfd, 1);
-    else if(redir_pipe=="<")
-        dup2(newfd,0);
-    pathResolve(input);
-}
 
 int shell (int argc, char *argv[]) {
     char *s = malloc(INPUT_STRING_SIZE+1);			/* user input string */
     tok_t *t;			/* tokens parsed from input */
     int lineNum = 0;
     int fundex = -1;
+    char dir[MAX_SIZE+1];
     pid_t pid = getpid();		/* get current processes PID */
     pid_t ppid = getppid();	/* get parents PID */
     pid_t cpid, tcpid, cpgid;
-    char dir[100] ="";
+
+
     init_shell();
 
     printf("%s running as PID %d under %d\n",argv[0],pid,ppid);
-    //getcwd(dir,100);
+
     lineNum=0;
-    fprintf(stdout, "%d %s: ", lineNum,getcwd(dir,100));
+    getcwd(dir,MAX_SIZE);
+    fprintf(stdout, "%d %s: ", lineNum,dir);
     while ((s = freadln(stdin))){
         t = getToks(s); /* break the line into tokens */
         fundex = lookup(t[0]); /* Is first token a shell literal */
         if(fundex >= 0) cmd_table[fundex].fun(&t[1]);
         else {
-            pid = fork();
-            if(pid<0)
-                perror("Fork process failed");
-            if(pid==0){
-                char *temp = strstr(s,">");
-                int i=0;
-                char * a=">", * b = "<";
-                for(i=0;i<MAXTOKS && t[i];i++){
-                    if (strcmp( t[i], a) == 0){
-                        t[i]=NULL;
-                        printf("%s",t[i+1]);
-                        redirect(t,t[i+1],a);
-                    }
-                    if(strcmp( t[i], b) == 0){
-                        t[i]=NULL;
-                        printf("%s",t[i+1]);
-                        redirect(t,t[i+1],b);
-                    }
-                }
-                pathResolve(t);
-
-
-            }
-            wait(NULL);
+            fprintf(stdout, "This shell only supports built-ins. Replace this to run programs as commands.\n");
         }
         lineNum++;
-        getcwd(dir,100);
-        fprintf(stdout, "%d %s: ", lineNum,getcwd(dir,100));
+        getcwd(dir,MAX_SIZE);
+        fprintf(stdout, "%d %s: ", lineNum,dir);
     }
     return 0;
 }
