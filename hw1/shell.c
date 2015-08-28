@@ -107,41 +107,43 @@ process* create_process(char* inputString)
 }
 
 char * concat(char * s1, char * s2){
-   char * result;
-   result = malloc(strlen(s1)+strlen(s2)+1);
-   strcpy(result,s1);
-   strcat(result,s2);
-return result;
+    char * result;
+    result = malloc(strlen(s1)+strlen(s2)+1);
+    strcpy(result,s1);
+    strcat(result,s2);
+    return result;
 }
 
 void pathResolve(tok_t * t){
- char * path_env=getenv("PATH"),* path;
- tok_t * pathToks = getToks(path_env);
- int i;
-	for(i=0;i<MAXTOKS && pathToks[i];i++){
-	 path = concat("/",t[0]);
-	 path = concat(pathToks[i],path);
-	 if(access(path,F_OK)!=-1){
-	 execve(path,t,NULL);
-	 //exit(0);
-        }		
-  }
-	//part 2
-   execv(*t,t);
-   perror(*t);
-   exit(0);
+    char * path_env=getenv("PATH"),* path;
+    tok_t * pathToks = getToks(path_env);
+    int i;
+    for(i=0;i<MAXTOKS && pathToks[i];i++){
+        path = concat("/",t[0]);
+        path = concat(pathToks[i],path);
+        if(access(path,F_OK)!=-1){
+            execve(path,t,NULL);
+            //exit(0);
+        }
+    }
+    //part 2
+    execv(*t,t);
+    perror(*t);
+    exit(0);
 }
 
-void redirect(tok_t *input,char * filename){ 
-int newfd; 
+void redirect(tok_t *input,char * filename,char * redir_pipe){
+    int newfd;
 
-  if ((newfd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644)) < 0) {
-	perror(input);
-	exit(1);
-  }
- dup2(newfd, 1);
- 
- pathResolve(input);
+    if ((newfd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644)) < 0) {
+        perror(input);
+        exit(1);
+    }
+    if(redir_pipe==">")
+        dup2(newfd, 1);
+    else if(redir_pipe=="<")
+        dup2(newfd,0);
+    pathResolve(input);
 }
 
 int shell (int argc, char *argv[]) {
@@ -168,24 +170,24 @@ int shell (int argc, char *argv[]) {
             if(pid<0)
                 perror("Fork process failed");
             if(pid==0){
- 		char *temp = strstr(s,">");
-		int i=0;
-		char * a=">", * b = "<";
-		for(i=0;i<MAXTOKS && t[i];i++){
-		 if (strcmp( t[i], a) == 0){
-	 	  t[i]=NULL;
-		  printf("%s",t[i+1]);
-		   redirect(t,t[i+1]);	
-                  }
-                  if(strcmp( t[i], b) == 0){
-                  t[i]=NULL;
-		  printf("%s",t[i+1]);
-		  redirect(t,t[i+1]);
-	          }
-		}
-              pathResolve(t);
-		
-		
+                char *temp = strstr(s,">");
+                int i=0;
+                char * a=">", * b = "<";
+                for(i=0;i<MAXTOKS && t[i];i++){
+                    if (strcmp( t[i], a) == 0){
+                        t[i]=NULL;
+                        printf("%s",t[i+1]);
+                        redirect(t,t[i+1],a);
+                    }
+                    if(strcmp( t[i], b) == 0){
+                        t[i]=NULL;
+                        printf("%s",t[i+1]);
+                        redirect(t,t[i+1],b);
+                    }
+                }
+                pathResolve(t);
+
+
             }
             wait(NULL);
         }
